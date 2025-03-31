@@ -9,17 +9,16 @@
 #         print(f"Device found: {device.get_info(rs.camera_info.name)}")
 
 
+import pyrealsense2 as rs
 
-# import pyrealsense2 as rs
+ctx = rs.context()
+devices = ctx.query_devices()
 
-# ctx = rs.context()
-# devices = ctx.query_devices()
+if len(devices) == 0:
+    raise RuntimeError("No RealSense device connected.")
 
-# if len(devices) == 0:
-#     raise RuntimeError("No RealSense device connected.")
-
-# for device in devices:
-#     print(f"Device found: {device.get_info(rs.camera_info.name)}")
+for device in devices:
+    print(f"Device found: {device.get_info(rs.camera_info.name)}")
     
-#     device.hardware_reset()
-#     print("Hardware reset done. Reconnect the camera and try again.")
+    device.hardware_reset()
+    print("Hardware reset done. Reconnect the camera and try again.")
