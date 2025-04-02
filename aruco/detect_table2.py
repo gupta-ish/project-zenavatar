@@ -2,6 +2,8 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 import os
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 ARUCO_DICT = cv2.aruco.DICT_4X4_50
 MARKER_LENGTH = 0.1  # meters
@@ -10,12 +12,11 @@ OUTPUT_FILE = "pose_output_1.txt"
 pipeline = rs.pipeline()
 config = rs.config()
 config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-
 pipeline.start(config)
 
 aruco_dict = cv2.aruco.getPredefinedDictionary(ARUCO_DICT)
 aruco_params = cv2.aruco.DetectorParameters()
-aruco_detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)  
+aruco_detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 
 profile = pipeline.get_active_profile()
 color_stream = profile.get_stream(rs.stream.color)
@@ -25,10 +26,17 @@ camera_matrix = np.array([[intr.fx, 0, intr.ppx],
                           [0, 0, 1]])
 dist_coeffs = np.array(intr.coeffs)
 
-
-# ClEARING THE OUTPUT FILE
 if os.path.exists(OUTPUT_FILE):
     os.remove(OUTPUT_FILE)
+
+plt.ion()
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.set_xlabel('X [m]')
+ax.set_ylabel('Y [m]')
+ax.set_zlabel('Z [m]')
+ax.set_title('ArUco Marker Pose')
+trajectory = []  
 
 try:
     while True:
@@ -47,20 +55,36 @@ try:
             for i in range(len(ids)):
                 cv2.drawFrameAxes(color_image, camera_matrix, dist_coeffs, rvecs[i], tvecs[i], 0.03)
 
+                tvec = tvecs[i].flatten()
+                trajectory.append(tvec)
+
                 with open(OUTPUT_FILE, "a") as f:
-                    with open(OUTPUT_FILE, "a") as f:
-                        x, y, z = tvecs[i].flatten()
-                        f.write(f"{x},{y},{z}\n")
-                    # f.write(f"ID: {ids[i][0]}\n")
-                    # f.write(f"Translation (tvec): {tvecs[i].flatten().tolist()}\n")
-                    # f.write(f"Rotation (rvec): {rvecs[i].flatten().tolist()}\n\n")
+                    f.write(f"ID: {ids[i][0]}\n")
+                    f.write(f"Translation (tvec): {tvec.tolist()}\n")
+                    f.write(f"Rotation (rvec): {rvecs[i].flatten().tolist()}\n\n")
+
+            # Update 3D Plot
+            ax.clear()
+            ax.set_xlabel('X [m]')
+            ax.set_ylabel('Y [m]')
+            ax.set_zlabel('Z [m]')
+            ax.set_title('ArUco Marker Pose (Live)')
+            if trajectory:
+                traj_np = np.array(trajectory)
+                ax.plot(traj_np[:, 0], traj_np[:, 1], traj_np[:, 2], marker='o', linestyle='-', color='b')
+                ax.scatter(traj_np[-1, 0], traj_np[-1, 1], traj_np[-1, 2], color='r', s=50, label='Current Pose')
+                ax.legend()
+            plt.draw()
+            plt.pause(0.001)
 
         cv2.imshow("ArUco Detection", color_image)
         key = cv2.waitKey(1)
-        if key == 27:  # Esc key
+        if key == 27: 
             break
 
 finally:
     pipeline.stop()
     cv2.destroyAllWindows()
+    plt.ioff()
+    plt.show()
     print(f"\nPose data is saved to '{OUTPUT_FILE}'")
